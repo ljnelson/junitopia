@@ -27,4 +27,4 @@ jobs:
           mvn-toolchain-vendor: 'openjdk' # see ../../pom.xml
       - id: 'mvn-verify'
         name: 'Step: Maven Verify'
-        run: 'mvn --batch-mode --color never --errors --no-transfer-progress -Dorg.slf4j.simpleLogger.defaultLogLevel=info verify'
+        run: './mvnw --batch-mode --color never --errors --no-transfer-progress -Dorg.slf4j.simpleLogger.defaultLogLevel=info verify'

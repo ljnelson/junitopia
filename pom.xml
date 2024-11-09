@@ -1,0 +1,459 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>io.github.ljnelson</groupId>
+  <artifactId>junitopia</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+
+  <name>junitopia 🎉</name>
+  <description>JUnit Jupiter Utilities</description>
+  <inceptionYear>2024</inceptionYear>
+  <url>https://ljnelson.github.io/junitopia/</url>
+
+  <organization>
+    <name>Laird Nelson</name>
+    <url>https://ljnelson.github.io/</url>
+  </organization>
+
+  <licenses>
+    <license>
+      <comments>The Apache License, Version 2.0</comments>
+      <distribution>repo</distribution>
+      <name>Apache License 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <id>ljnelson</id>
+      <name>Laird Nelson</name>
+      <email>ljnelson@gmail.com</email>
+      <url>https://about.me/lairdnelson</url>
+      <roles>
+        <role>architect</role>
+        <role>developer</role>
+      </roles>
+      <timezone>-8</timezone>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>${scm.url}</connection>
+    <developerConnection>${scm.url}</developerConnection>
+    <url>https://github.com/ljnelson/junitopia/</url>
+    <tag>HEAD</tag>
+  </scm>
+
+  <issueManagement>
+    <system>Github</system>
+    <url>https://github.com/ljnelson/junitopia/issues</url>
+  </issueManagement>
+
+  <distributionManagement>
+    <site>
+      <id>Github Pages</id>
+      <name>JUnitopia</name>
+      <url>https://ljnelson.github.io/junitopia/</url>
+    </site>
+    <snapshotRepository>
+      <id>sonatype-oss-repository-hosting</id>
+      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+    </snapshotRepository>
+  </distributionManagement>
+
+  <properties>
+    <java.util.logging.config.file>src/test/java/logging.properties</java.util.logging.config.file>
+
+    <!-- maven-compiler-plugin properties -->
+    <maven.compiler.release>11</maven.compiler.release> <!-- 11 is the minimum Jakarta EE 10 Java version -->
+    <maven.compiler.showDeprecation>true</maven.compiler.showDeprecation>
+    <maven.compiler.showWarnings>true</maven.compiler.showWarnings>
+
+    <!-- maven-javadoc-plugin properties -->
+    <links>https://jakarta.ee/specifications/cdi/4.1/apidocs/,https://junit.org/junit5/docs/5.11.3/api/</links>
+
+    <!-- maven-release-plugin properties -->
+    <goals>deploy</goals>
+    <!-- See http://central.sonatype.org/pages/apache-maven.html#performing-a-release-deployment-with-the-maven-release-plugin -->
+    <releaseProfiles>deployment</releaseProfiles>
+
+    <!-- maven-surefire-plugin properties -->
+    <!-- See https://issues.apache.org/jira/browse/SUREFIRE-2191 -->
+    <surefire.useModulePath>false</surefire.useModulePath>
+
+    <!-- nexus-staging-maven-plugin properties -->
+    <!-- See https://github.com/sonatype/nexus-maven-plugins/blob/0aee3defb33cb133ff536aba59b11d32a368b1e6/staging/maven-plugin/src/main/java/org/sonatype/nexus/maven/staging/AbstractStagingMojo.java#L169-L175 -->
+    <autoReleaseAfterClose>true</autoReleaseAfterClose>
+    <!-- <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl> -->
+    <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+    <stagingProgressTimeoutMinutes>10</stagingProgressTimeoutMinutes>
+    
+    <!-- Other properties -->
+    <project.build.sourceEncoding>UTF8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF8</project.reporting.outputEncoding>
+    <scm.url>scm:git:git@github.com:ljnelson/junitopia.git</scm.url>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+
+      <!-- BOM dependencies. -->
+
+      <dependency>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>5.11.3</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <dependency>
+        <groupId>org.jboss.weld</groupId>
+        <artifactId>weld-core-bom</artifactId>
+        <version>5.1.3.Final</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- Normal dependencies. -->
+
+      <dependency>
+        <groupId>jakarta.enterprise</groupId>
+        <artifactId>jakarta.enterprise.cdi-api</artifactId>
+        <version>4.0.1</version>
+      </dependency>
+
+      <dependency>
+        <groupId>jakarta.inject</groupId>
+        <artifactId>jakarta.inject-api</artifactId>
+        <version>2.0.1</version>
+      </dependency>
+
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+    </dependency>
+    
+    <dependency>
+      <groupId>jakarta.enterprise</groupId>
+      <artifactId>jakarta.enterprise.cdi-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>jakarta.inject</groupId>
+      <artifactId>jakarta.inject-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.jboss.weld.se</groupId>
+      <artifactId>weld-se-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <artifactId>maven-antrun-plugin</artifactId>
+          <version>3.1.0</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-assembly-plugin</artifactId>
+          <version>3.7.1</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-checkstyle-plugin</artifactId>
+          <version>3.6.0</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-clean-plugin</artifactId>
+          <version>3.4.0</version>
+          <configuration>
+            <filesets>
+              <fileset>
+                <directory>${basedir}</directory>
+                <includes>
+                  <include>src/**/*~</include>
+                  <include>*~</include>
+                </includes>
+              </fileset>
+            </filesets>
+          </configuration>
+        </plugin>
+        <plugin>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.13.0</version>
+          <configuration>
+            <compilerArgs>
+              <arg>-Xlint:all</arg>
+              <arg>-parameters</arg>
+            </compilerArgs>
+          </configuration>
+          <dependencies>
+            <dependency>
+              <groupId>org.codehaus.plexus</groupId>
+              <artifactId>plexus-java</artifactId>
+              <version>1.3.0</version>
+            </dependency>
+          </dependencies>
+        </plugin>
+        <plugin>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <version>3.8.1</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-deploy-plugin</artifactId>
+          <version>3.1.3</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-enforcer-plugin</artifactId>
+          <version>3.5.0</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-gpg-plugin</artifactId>
+          <!-- <version>3.1.0</version> -->
+          <version>3.2.7</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-install-plugin</artifactId>
+          <version>3.1.3</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>3.4.2</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-javadoc-plugin</artifactId>
+          <version>3.11.1</version>
+          <configuration>
+            <docfilessubdirs>true</docfilessubdirs>
+          </configuration>
+        </plugin>
+        <plugin>
+          <artifactId>maven-plugin-plugin</artifactId>
+          <version>3.9.0</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-project-info-reports-plugin</artifactId>
+          <version>3.8.0</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-release-plugin</artifactId>
+          <!-- <version>3.0.0-M6</version> --> <!-- see https://issues.apache.org/jira/browse/MRELEASE-1038 -->
+          <version>3.1.1</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-resources-plugin</artifactId>
+          <version>3.3.1</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-scm-plugin</artifactId>
+          <version>2.1.0</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-scm-publish-plugin</artifactId>
+          <version>3.3.0</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-site-plugin</artifactId>
+          <version>4.0.0-M16</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-source-plugin</artifactId>
+          <version>3.3.1</version>
+          <executions>
+            <execution>
+              <id>attach-sources</id>
+              <goals>
+                <goal>jar-no-fork</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>3.5.2</version>
+          <dependencies>
+            <dependency>
+              <groupId>org.apache.maven.surefire</groupId>
+              <artifactId>surefire-junit-platform</artifactId>
+              <version>3.5.2</version>
+            </dependency>
+          </dependencies>
+        </plugin>
+        <plugin>
+          <artifactId>maven-toolchains-plugin</artifactId>
+          <version>3.2.0</version>
+        </plugin>
+        <plugin>
+          <groupId>com.github.spotbugs</groupId>
+          <artifactId>spotbugs-maven-plugin</artifactId>
+          <version>4.8.6.5</version>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>versions-maven-plugin</artifactId>
+          <version>2.17.1</version>
+        </plugin>
+        <plugin>
+          <groupId>io.smallrye</groupId>
+          <artifactId>jandex-maven-plugin</artifactId>
+          <version>3.2.3</version>
+        </plugin>
+        <plugin>
+          <groupId>org.sonatype.plugins</groupId>
+          <artifactId>nexus-staging-maven-plugin</artifactId>
+          <version>1.6.13</version>
+          <extensions>true</extensions>
+          <dependencies>
+            <!-- https://issues.sonatype.org/browse/NEXUS-26993?focusedCommentId=1098136&page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-1098136 -->
+            <dependency>
+              <groupId>com.thoughtworks.xstream</groupId>
+              <artifactId>xstream</artifactId>
+              <version>1.4.20</version>
+            </dependency>
+          </dependencies>
+          <configuration>
+            <serverId>sonatype-oss-repository-hosting</serverId>
+            <nexusUrl>${nexusUrl}</nexusUrl>
+            <autoReleaseAfterClose>${autoReleaseAfterClose}</autoReleaseAfterClose>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+
+    <plugins>
+      <plugin>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-maven</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireMavenVersion>
+                  <version>3.9.9</version>
+                </requireMavenVersion>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <!-- See https://github.com/apache/maven-surefire/blob/eb48f1b59ca5ccf6954ef33ecab03dbaf93214cd/surefire-providers/surefire-junit-platform/src/main/java/org/apache/maven/surefire/junitplatform/JUnitPlatformProvider.java#L242-L262 -->
+            <properties>
+              <configurationParameters>
+                junit.jupiter.execution.parallel.enabled=true
+                junit.jupiter.execution.parallel.mode.default=concurrent
+                junit.jupiter.testclass.order.default=org.junit.jupiter.api.ClassOrderer$Random
+                junit.jupiter.testmethod.order.default=org.junit.jupiter.api.MethodOrderer$Random
+                junit.platform.stacktrace.pruning.enabled=true
+              </configurationParameters>
+            </properties>
+          <systemPropertyVariables>
+            <java.util.logging.config.file>${java.util.logging.config.file}</java.util.logging.config.file>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-toolchains-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>toolchain</goal>
+            </goals>
+            <configuration>
+              <toolchains>
+                <jdk>
+                  <vendor>openjdk</vendor>
+                  <version>23</version>
+                </jdk>
+              </toolchains>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+  <reporting>
+    <plugins>
+      <!--
+      <plugin>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <reportSets>
+          <reportSet>
+            <reports>
+              <report>checkstyle</report>
+            </reports>
+          </reportSet>
+        </reportSets>
+        </plugin>
+      -->
+      <plugin>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <reportSets>
+          <reportSet>
+            <reports>
+              <report>javadoc-no-fork</report>
+            </reports>
+          </reportSet>
+        </reportSets>
+      </plugin>
+    </plugins>
+  </reporting>
+
+  <profiles>
+    <profile>
+      <id>deployment</id>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <artifactId>maven-source-plugin</artifactId>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
+</project>

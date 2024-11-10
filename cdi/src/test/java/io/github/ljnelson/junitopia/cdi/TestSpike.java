@@ -13,6 +13,8 @@
  */
 package io.github.ljnelson.junitopia.cdi;
 
+import jakarta.annotation.PreDestroy;
+
 import jakarta.enterprise.inject.Produces;
 
 import jakarta.enterprise.inject.se.SeContainer;
@@ -29,16 +31,20 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestReporter;
 
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.TestInstanceFactory;
+import org.junit.jupiter.api.extension.TestInstanceFactoryContext;
 
 import static io.github.ljnelson.junitopia.cdi.CdiSeContainerStarter.Original;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_METHOD;
 
 @ExtendWith(CdiArgumentResolver.class) // provides test methods with arguments
-@ExtendWith(CdiSeContainerStarter.class) // starts container
+@ExtendWith(CdiSeContainerStarter.class) // starts container; creates test instance
 @ExtendWith(StringSetter.class) // stupid BeforeAllCallback stub that sets static String fields to "Test"
 @ExtendWith(ClientProxyInvocationInterceptor.class) // forces all test methods to go through CDI invocation
 @TestInstance(PER_METHOD)
@@ -56,12 +62,11 @@ class TestSpike {
     assertEquals("Test", gorp); // if this class is extended with StringSetter
   }
 
-  @BeforeEach
-  void setFortyTwo(final TestInfo testInfo, final TestReporter testReporter) {
-    this.fortyTwo = Integer.valueOf(42);
-    System.out.println("*** testInfo.getClass(): " + testInfo.getClass());
+  TestSpike(TestInfo ti) {
+    super();
+    assertNotNull(ti);
   }
-
+  
   @Inject
   TestSpike(final String gorp, @Original TestSpike original, TestInfo ti) {
     super();
@@ -70,6 +75,12 @@ class TestSpike {
     System.out.println("*** original: " + original);
     System.out.println("*** this.fortyTwo: " + this.fortyTwo);
     System.out.println("*** original.fortyTwo: " + original.fortyTwo);
+  }
+
+  @BeforeEach
+  void setFortyTwo(final TestInfo testInfo, final TestReporter testReporter) {
+    this.fortyTwo = Integer.valueOf(42);
+    System.out.println("*** testInfo.getClass(): " + testInfo.getClass());
   }
   
   @Test
@@ -85,5 +96,10 @@ class TestSpike {
   void blat() {
     System.out.println("*** blat");
   }
-  
+
+  @PreDestroy
+  void preDestroy() {
+    System.out.println("*** destroying TestSpike (" + this + ")");
+  }
+
 }

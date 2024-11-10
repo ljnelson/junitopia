@@ -36,19 +36,14 @@ import org.junit.jupiter.api.extension.ExtensionContext.Store;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
 import org.junit.jupiter.api.extension.ReflectiveInvocationContext;
 
-public class ClientProxyInvocationInterceptor implements InvocationInterceptor {
+public class ClientProxyInvocationInterceptor extends AbstractCdiExtension implements InvocationInterceptor {
 
-  public static final Namespace NAMESPACE = Namespace.create((Object[])Instance.class.getPackage().getName().split("\\."));
-
-  private final Supplier<? extends Instance<Object>> fallback;
-  
   public ClientProxyInvocationInterceptor() {
-    this(CDI::current);
+    super(CDI::current);
   }
 
   public ClientProxyInvocationInterceptor(final Supplier<? extends Instance<Object>> fallback) {
-    super();
-    this.fallback = Objects.requireNonNull(fallback, "fallback");
+    super(fallback);
   }
 
   @Override
@@ -75,28 +70,6 @@ public class ClientProxyInvocationInterceptor implements InvocationInterceptor {
       }
     }
     invocation.proceed();
-  }
-
-  private static final BeanManager bm(final Instance<Object> i) {
-    return
-      i instanceof SeContainer ? ((SeContainer)i).getBeanManager() :
-      i instanceof CDI ? ((CDI)i).getBeanManager() :
-      i.select(BeanManager.class).get();
-  }
-
-  private static final <T> Annotation[] qs(final Class<?> c, final BeanManager bm) {
-    final Collection<? extends Annotation> qualifiers = bm.createBeanAttributes(bm.createAnnotatedType(c)).getQualifiers();
-    return qualifiers.isEmpty() ? new Annotation[] { Default.Literal.INSTANCE } : qualifiers.toArray(new Annotation[0]);
-  }
-  
-  private final Instance<Object> i(final ExtensionContext extensionContext) {
-    return i(extensionContext.getStore(NAMESPACE));
-  }
-
-  @SuppressWarnings("unchecked")
-  private final Instance<Object> i(final Store store) {
-    final Instance<Object> i = (Instance<Object>)store.get(Instance.class);
-    return i == null ? this.fallback.get() : i;
   }
 
 }

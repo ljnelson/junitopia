@@ -11,29 +11,10 @@
  * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
  * specific language governing permissions and limitations under the License.
  */
-package io.github.ljnelson.junitopia.cdi;
+module io.github.ljnelson.junitopia {
 
-import org.junit.jupiter.api.Test;
+  requires transitive org.junit.jupiter.api;
 
-import org.junit.jupiter.api.extension.ExtensionContext.Namespace;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-final class TestNamespaceEquality {
-
-  private TestNamespaceEquality() {
-    super();
-  }
-
-  @Test
-  final void testEquality() {
-    assertEquals(Namespace.create("a", "b", "c"), Namespace.create("a", "b", "c"));
-  }
-
-  @Test
-  final void testComponentNamespacesAreEqual() {
-    assertEquals(CdiSeContainerStarter.NAMESPACE, CdiArgumentResolver.NAMESPACE);
-    assertEquals(CdiSeContainerStarter.NAMESPACE, ClientProxyInvocationInterceptor.NAMESPACE);
-  }
+  exports io.github.ljnelson.junitopia;
 
 }

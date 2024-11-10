@@ -3,13 +3,14 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>io.github.ljnelson</groupId>
-  <artifactId>junitopia</artifactId>
+  <artifactId>junitopia-parent</artifactId>
   <version>0.0.1-SNAPSHOT</version>
+  <packaging>pom</packaging>
 
-  <name>junitopia 🎉</name>
-  <description>JUnit Jupiter Utilities</description>
+  <name>JUnitopia: Parent</name>
+  <description>JUnitopia: Parent: The parent project of hte JUnitopia project suite.</description>
   <inceptionYear>2024</inceptionYear>
-  <url>https://ljnelson.github.io/junitopia/</url>
+  <url>https://ljnelson.github.io/junitopia</url>
 
   <organization>
     <name>Laird Nelson</name>
@@ -52,6 +53,11 @@
   </issueManagement>
 
   <distributionManagement>
+    <repository>
+      <id>sonatype-oss-repository-hosting</id>
+      <!-- See https://central.sonatype.org/publish/publish-maven/#distribution-management-and-authentication -->
+      <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+    </repository>
     <site>
       <id>Github Pages</id>
       <name>JUnitopia</name>
@@ -63,6 +69,11 @@
     </snapshotRepository>
   </distributionManagement>
 
+  <modules>
+    <module>cdi</module>
+    <module>junitopia</module>
+  </modules>
+
   <properties>
     <java.util.logging.config.file>src/test/java/logging.properties</java.util.logging.config.file>
 
@@ -72,12 +83,24 @@
     <maven.compiler.showWarnings>true</maven.compiler.showWarnings>
 
     <!-- maven-javadoc-plugin properties -->
+    <bottom><![CDATA[Copyright &copy; ${project.inceptionYear}&ndash;{currentYear}, <a href="${project.organization.url}" target="_top">${project.organization.name}</a>. All rights reserved.]]></bottom>
     <links>https://jakarta.ee/specifications/cdi/4.1/apidocs/,https://junit.org/junit5/docs/5.11.3/api/</links>
 
     <!-- maven-release-plugin properties -->
-    <goals>deploy</goals>
+    <goals>deploy,post-site,scm-publish:publish-scm</goals>
     <!-- See http://central.sonatype.org/pages/apache-maven.html#performing-a-release-deployment-with-the-maven-release-plugin -->
     <releaseProfiles>deployment</releaseProfiles>
+    <scmCommentPrefix>[maven-release-plugin] [skip ci]</scmCommentPrefix>
+    <tagNameFormat>v@{project.version}</tagNameFormat>
+
+    <!-- maven-scm-publish-plugin properties;
+         see https://maven.apache.org/plugins/maven-scm-publish-plugin/publish-scm-mojo.html -->
+    <scmpublish.pubScmUrl>${project.scm.developerConnection}</scmpublish.pubScmUrl>
+    <scmpublish.scm.branch>gh-pages</scmpublish.scm.branch>
+
+    <!-- maven-site-plugin properties -->
+    <maven.site.deploy.skip>true</maven.site.deploy.skip>
+    <topSiteUrl>https://ljnelson.github.io/junitopia/</topSiteUrl>
 
     <!-- maven-surefire-plugin properties -->
     <!-- See https://issues.apache.org/jira/browse/SUREFIRE-2191 -->
@@ -89,7 +112,7 @@
     <!-- <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl> -->
     <nexusUrl>https://oss.sonatype.org/</nexusUrl>
     <stagingProgressTimeoutMinutes>10</stagingProgressTimeoutMinutes>
-    
+
     <!-- Other properties -->
     <project.build.sourceEncoding>UTF8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF8</project.reporting.outputEncoding>
@@ -133,35 +156,6 @@
 
     </dependencies>
   </dependencyManagement>
-
-  <dependencies>
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-api</artifactId>
-    </dependency>
-    
-    <dependency>
-      <groupId>jakarta.enterprise</groupId>
-      <artifactId>jakarta.enterprise.cdi-api</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>jakarta.inject</groupId>
-      <artifactId>jakarta.inject-api</artifactId>
-      <scope>provided</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.jboss.weld.se</groupId>
-      <artifactId>weld-se-core</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-engine</artifactId>
-      <scope>test</scope>
-    </dependency>
-  </dependencies>
 
   <build>
     <pluginManagement>

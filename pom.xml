@@ -71,7 +71,6 @@
 
   <modules>
     <module>cdi</module>
-    <module>junitopia</module>
   </modules>
 
   <properties>
@@ -358,7 +357,7 @@
                 junit.jupiter.execution.parallel.mode.default=concurrent
                 junit.jupiter.testclass.order.default=org.junit.jupiter.api.ClassOrderer$Random
                 junit.jupiter.testmethod.order.default=org.junit.jupiter.api.MethodOrderer$Random
-                junit.platform.stacktrace.pruning.enabled=true
+                junit.platform.stacktrace.pruning.enabled=false
               </configurationParameters>
             </properties>
           <systemPropertyVariables>

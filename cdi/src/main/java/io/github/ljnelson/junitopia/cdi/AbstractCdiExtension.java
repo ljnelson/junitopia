@@ -17,11 +17,11 @@ import java.lang.annotation.Annotation;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
+import java.lang.reflect.Field;
 
 import java.util.Collection;
-import java.util.Objects;
 
-import java.util.function.Supplier;
+import java.util.function.Function;
 
 import jakarta.enterprise.inject.Default;
 import jakarta.enterprise.inject.Instance;
@@ -37,31 +37,41 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ExtensionContext.Namespace;
 import org.junit.jupiter.api.extension.ExtensionContext.Store;
 
+import static org.junit.platform.commons.support.HierarchyTraversalMode.BOTTOM_UP;
+
+import static org.junit.platform.commons.support.ReflectionSupport.streamFields;
+
 class AbstractCdiExtension {
 
   static final Namespace NAMESPACE = Namespace.create((Object[])Instance.class.getPackage().getName().split("\\."));
-  
-  final Supplier<? extends Instance<Object>> fallback;
 
-  AbstractCdiExtension(final Supplier<? extends Instance<Object>> fallback) {
-    super();
-    this.fallback = Objects.requireNonNull(fallback, "fallback");
+  private final Function<? super ExtensionContext, ? extends Instance<Object>> fallback;
+
+  AbstractCdiExtension() {
+    this(AbstractCdiExtension::fallback);
   }
 
-  BeanManager bm(final ExtensionContext extensionContext) {
-    final Instance<Object> i = i(extensionContext.getStore(NAMESPACE));
+  AbstractCdiExtension(final Function<? super ExtensionContext, ? extends Instance<Object>> fallback) {
+    super();
+    this.fallback = fallback == null ? ec -> null : fallback;
+  }
+
+  final BeanManager bm(final ExtensionContext extensionContext) {
+    final Instance<Object> i = i(extensionContext);
     return i == null ? null : bm(i);
   }
 
   final Instance<Object> i(final ExtensionContext extensionContext) {
-    return i(extensionContext.getStore(NAMESPACE));
+    @SuppressWarnings("unchecked")
+    Instance<Object> i = (Instance<Object>)extensionContext.getStore(NAMESPACE).get(Instance.class);
+    return i == null ? this.fallback.apply(extensionContext) : i;
   }
-  
-  @SuppressWarnings("unchecked")
-  Instance<Object> i(final Store store) {
-    final Instance<Object> i = (Instance<Object>)store.get(Instance.class);
-    return i == null ? this.fallback.get() : i;
-  }
+
+
+  /*
+   * Static methods.
+   */
+
 
   static final BeanManager bm(final Instance<Object> i) {
     return
@@ -88,5 +98,31 @@ class AbstractCdiExtension {
     final Collection<? extends Annotation> qualifiers = ip(e, index, bm).getQualifiers();
     return qualifiers.isEmpty() ? new Annotation[] { Default.Literal.INSTANCE } : qualifiers.toArray(Annotation[]::new);
   }
-  
+
+  @SuppressWarnings("unchecked")
+  private static final Instance<Object> fallback(final ExtensionContext ec) {
+    return ec.getTestInstance()
+      .flatMap(i -> streamFields(i.getClass(), AbstractCdiExtension::isInstanceObjectOrBeanManager, BOTTOM_UP)
+               .findFirst()
+               .map(f -> {
+                   try {
+                     return f.trySetAccessible() ?
+                       Instance.class.isAssignableFrom(f.getType()) ?
+                       (Instance<Object>)f.get(i) :
+                       ((BeanManager)f.get(i)).createInstance() :
+                       null;
+                   } catch (final ReflectiveOperationException e) {
+                     throw new RuntimeException(e.getMessage(), e);
+                   }
+                 }))
+      .orElse(null);
+  }
+
+  private static final boolean isInstanceObjectOrBeanManager(final Field f) {
+    final Class<?> fieldType = f.getType();
+    return
+      Instance.class.isAssignableFrom(fieldType) ||
+      BeanManager.class.isAssignableFrom(fieldType);
+  }
+
 }

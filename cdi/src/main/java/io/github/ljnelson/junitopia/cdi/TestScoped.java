@@ -11,10 +11,24 @@
  * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
  * specific language governing permissions and limitations under the License.
  */
-module io.github.ljnelson.junitopia {
+package io.github.ljnelson.junitopia.cdi;
 
-  requires transitive org.junit.jupiter.api;
+import java.lang.annotation.Inherited;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
-  exports io.github.ljnelson.junitopia;
+import jakarta.enterprise.context.NormalScope;
+
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.TYPE;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Inherited
+@Retention(RUNTIME)
+@NormalScope
+@Target({ FIELD, METHOD, TYPE })
+public @interface TestScoped {
 
 }

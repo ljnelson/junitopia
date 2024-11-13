@@ -13,23 +13,19 @@
  */
 package io.github.ljnelson.junitopia.cdi;
 
-import java.lang.annotation.Annotation;
+import java.lang.System.Logger;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Executable;
 import java.lang.reflect.Parameter;
 
-import java.util.Collection;
 import java.util.Set;
 
-import java.util.function.Supplier;
+import java.util.function.Function;
 
-import jakarta.enterprise.inject.Default;
+import jakarta.enterprise.context.spi.CreationalContext;
+
 import jakarta.enterprise.inject.Instance;
 
-import jakarta.enterprise.inject.spi.AnnotatedType;
 import jakarta.enterprise.inject.spi.BeanManager;
-import jakarta.enterprise.inject.spi.CDI;
 import jakarta.enterprise.inject.spi.InjectionPoint;
 
 import org.junit.jupiter.api.RepetitionInfo;
@@ -40,48 +36,71 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolver;
 
-public final class CdiArgumentResolver extends AbstractCdiExtension implements ParameterResolver {
+import static java.lang.System.getLogger;
 
+import static java.lang.System.Logger.Level.DEBUG;
+
+public class CdiArgumentResolver extends AbstractCdiExtension implements ParameterResolver {
+
+  private static final Logger LOGGER = getLogger(CdiArgumentResolver.class.getName());
+  
   private static final Set<Class<?>> SPECIAL_CLASSES = Set.of(RepetitionInfo.class, TestInfo.class, TestReporter.class);
   
   public CdiArgumentResolver() {
-    super(CDI::current);
+    super();
   }
 
-  public CdiArgumentResolver(final Supplier<? extends Instance<Object>> fallback) {
+  public CdiArgumentResolver(final Function<? super ExtensionContext, ? extends Instance<Object>> fallback) {
     super(fallback);
   }
 
   @Override
-  public final boolean supportsParameter(final ParameterContext parameterContext,
-                                         final ExtensionContext extensionContext) {
+  public boolean supportsParameter(final ParameterContext parameterContext,
+                                   final ExtensionContext extensionContext) {
     final Parameter p = parameterContext.getParameter();
     if (SPECIAL_CLASSES.contains(p.getType())) {
-      return false; // Let JUnit handle them natively
+      // There is no technical restriction on this ParameterResolver implementation that prevents it from supporting the
+      // parameter in question. But there cannot be two ParameterResolvers that claim to support the same parameter, and
+      // it is impossible for one ParameterResolver to discover the existence of another. As of this writing, JUnit's
+      // built-in ParameterResolver is always present and always handles the types in SPECIAL_TYPES, so we bow out.
+      if (LOGGER.isLoggable(DEBUG)) {
+        LOGGER.log(DEBUG, "Not supporing CDI typesafe resolution of parameter " +
+                   p +
+                   " because it is a built-in JUnit type");
+      }
+      return false;
     }
     BeanManager bm;
     try {
       bm = bm(extensionContext);
     } catch (final IllegalStateException e) {
+      // Likely something like CDI.current() failed.
+      if (LOGGER.isLoggable(DEBUG)) {
+        LOGGER.log(DEBUG, e.getMessage(), e);
+      }
       bm = null;
     }
+    if (bm == null) {
+      if (LOGGER.isLoggable(DEBUG)) {
+        LOGGER.log(DEBUG, "No BeanManager present");
+      }
+      return false;
+    }
     return
-      bm != null &&
       bm.resolve(bm.getBeans(p.getParameterizedType(),
-                             qs(p.getDeclaringExecutable(),
-                                parameterContext.getIndex(),
-                                bm))) != null;
+                             qs(p.getDeclaringExecutable(), parameterContext.getIndex(), bm))) != null;
   }
 
   @Override
-  public final Object resolveParameter(final ParameterContext parameterContext,
-                                       final ExtensionContext extensionContext) {
+  public Object resolveParameter(final ParameterContext parameterContext,
+                                 final ExtensionContext extensionContext) {
     final BeanManager bm = bm(extensionContext);
-    return
-      bm.getInjectableReference(ip(parameterContext.getParameter().getDeclaringExecutable(),
-                                   parameterContext.getIndex(),
-                                   bm),
-                                bm.createCreationalContext(null));
+    final InjectionPoint ip = ip(parameterContext.getParameter().getDeclaringExecutable(),
+                                 parameterContext.getIndex(),
+                                 bm);
+    final CreationalContext<Object> cc = new CloseableCreationalContext<>(bm.createCreationalContext(null));
+    extensionContext.getStore(NAMESPACE).put(cc, cc); // will auto-release when test is over
+    return bm.getInjectableReference(ip, cc);
   }
 
 }

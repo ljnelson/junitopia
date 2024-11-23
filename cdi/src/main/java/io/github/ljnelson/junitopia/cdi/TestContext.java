@@ -24,10 +24,13 @@ import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import java.util.function.Supplier;
+
 import jakarta.enterprise.context.spi.AlterableContext;
 import jakarta.enterprise.context.spi.Contextual;
 import jakarta.enterprise.context.spi.CreationalContext;
 
+import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ExtensionContext.Store;
 import org.junit.jupiter.api.extension.ExtensionContext.Store.CloseableResource;
 
@@ -40,6 +43,10 @@ public class TestContext implements AlterableContext {
     this.store = Objects.requireNonNull(store, "store");
   }
 
+  private final Store store() {
+    return this.store;
+  }
+  
   @Override // AlterableContext
   public final void destroy(final Contextual<?> c) {
     this.destroy0(c);
@@ -47,7 +54,7 @@ public class TestContext implements AlterableContext {
 
   private final <T> void destroy0(final Contextual<T> c) {
     @SuppressWarnings("unchecked")
-    final CI<T> ci = (CI<T>)store.remove(c);
+    final CI<T> ci = (CI<T>)this.store().remove(c);
     try {
       c.destroy(ci.i, ci.cc);
     } finally {
@@ -64,10 +71,10 @@ public class TestContext implements AlterableContext {
   @SuppressWarnings("unchecked")
   public final <T> T get(final Contextual<T> c, final CreationalContext<T> cc) {
     if (cc == null) {
-      final CI<T> ci = (CI<T>)store.get(c);
+      final CI<T> ci = (CI<T>)this.store().get(c);
       return ci == null ? null : ci.i;
     }
-    return ((CI<T>)store.getOrComputeIfAbsent(c, bean -> new CI<>(bean.create(cc), cc))).i;
+    return ((CI<T>)this.store().getOrComputeIfAbsent(c, bean -> new CI<>(bean.create(cc), cc))).i;
   }
 
   @Override // AlterableContext (Context)

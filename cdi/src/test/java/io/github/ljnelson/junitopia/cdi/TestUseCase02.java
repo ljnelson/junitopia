@@ -13,33 +13,42 @@
  */
 package io.github.ljnelson.junitopia.cdi;
 
-import jakarta.enterprise.inject.Produces;
+import jakarta.enterprise.inject.Instance;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import jakarta.inject.Inject;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_METHOD;
 
 @ExtendWith(CdiSupport.class)
 @TestInstance(PER_METHOD)
-class TestUseCase00 {
+class TestUseCase02 {
 
-  @Produces
-  private static final int fortyTwo = 42;
-  
-  private TestUseCase00() {
+  @Inject
+  private TestUseCase02() {
     super();
   }
 
   @Test
-  void testArgumentResolved(int fortyTwo) {
-    assertEquals(42, fortyTwo);
+  void testContainerInjected(final Instance<Object> container) {
+    assertNotNull(container);
+    final Object contextualReference = container.select(this.getClass()).get();
+    assertTrue(this.getClass().isInstance(contextualReference));
+    assertNotSame(this, contextualReference);
+  }
+
+  @Test
+  void testTestInstanceInjected(final TestUseCase02 contextualReference) {
+    assertNotNull(contextualReference);
+    assertNotSame(this, contextualReference);
   }
 
 }

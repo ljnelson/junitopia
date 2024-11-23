@@ -21,16 +21,15 @@ import java.lang.annotation.Target;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import jakarta.enterprise.context.Dependent;
@@ -59,13 +58,11 @@ import jakarta.enterprise.inject.spi.WithAnnotations;
 
 import jakarta.enterprise.inject.spi.configurator.AnnotatedConstructorConfigurator;
 
-import jakarta.enterprise.util.AnnotationLiteral;
-
 import jakarta.inject.Inject;
-import jakarta.inject.Qualifier;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.TestReporter;
 
 import org.junit.jupiter.api.extension.BeforeTestExecutionCallback;
@@ -77,7 +74,6 @@ import org.junit.jupiter.api.extension.InvocationInterceptor.Invocation;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
 import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolutionException;
-import org.junit.jupiter.api.extension.ParameterResolver;
 import org.junit.jupiter.api.extension.ReflectiveInvocationContext;
 import org.junit.jupiter.api.extension.TestInstanceFactory;
 import org.junit.jupiter.api.extension.TestInstanceFactoryContext;
@@ -89,10 +85,6 @@ import static java.lang.System.Logger.Level.DEBUG;
 import static java.lang.System.Logger.Level.INFO;
 import static java.lang.System.Logger.Level.TRACE;
 import static java.lang.System.Logger.Level.WARNING;
-
-import static java.lang.annotation.ElementType.PARAMETER;
-
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_METHOD;
 
@@ -169,32 +161,16 @@ public class CdiSupport extends CdiArgumentResolver
 
   @Override // BeforeTestExecutionCallback
   @SuppressWarnings("unchecked")
-  public final void beforeTestExecution(final ExtensionContext ec) throws Exception {
-    final Store store = findStoreForSeContainer(ec);
+  public final void beforeTestExecution(final ExtensionContext methodLevelEc) throws Exception {
+    // Enforce preconditions
+    methodLevelEc.getRequiredTestClass();
+    methodLevelEc.getRequiredTestInstance();
+
+    final Store store = findStoreForSeContainer(methodLevelEc);
     Instance<Object> i = (Instance<Object>)store.get(Instance.class);
     if (i == null) {
-      store.getOrComputeIfAbsent("SeContainerCloser", n -> (CloseableResource)() -> {
-          final Object sec = store.get(Instance.class);
-          if (sec instanceof SeContainer) {
-            if (LOGGER.isLoggable(DEBUG)) {
-              LOGGER.log(DEBUG, "Closing " + sec);
-            }
-            ((SeContainer)sec).close();
-          }
-        });
-      i = (Instance<Object>)store.getOrComputeIfAbsent(Instance.class,
-                                                       x -> {
-                                                         final SeContainerInitializer sci = computeSeContainerInitializerIfAbsent(ec, store);
-                                                         if (LOGGER.isLoggable(TRACE)) {
-                                                           LOGGER.log(TRACE, "Creating SeContainer using " + sci);
-                                                         }
-                                                         final SeContainer sec =
-                                                           computeSeContainerInitializerIfAbsent(ec, store).initialize();
-                                                         if (LOGGER.isLoggable(TRACE)) {
-                                                           LOGGER.log(TRACE, "Created SeContainer: " + sec);
-                                                         }
-                                                         return sec;
-                                                       });
+      store.getOrComputeIfAbsent("SeContainerCloser", n -> new SeContainerCloser(() -> store.get(Instance.class)));
+      i = (Instance<Object>)store.getOrComputeIfAbsent(Instance.class, __ -> newSeContainer(methodLevelEc, store));
       if (LOGGER.isLoggable(DEBUG)) {
         LOGGER.log(DEBUG, "Using new Instance<Object>: " + i);
       }
@@ -205,23 +181,43 @@ public class CdiSupport extends CdiArgumentResolver
     }
   }
 
-  private final SeContainerInitializer computeSeContainerInitializerIfAbsent(final ExtensionContext ec) {
-    return computeSeContainerInitializerIfAbsent(ec, findStoreForSeContainer(ec));
+  private final SeContainer newSeContainer(final ExtensionContext methodLevelEc, final Store store) {
+    // Enforce preconditions
+    methodLevelEc.getRequiredTestInstance();
+
+    methodLevelExtensionContextSupplier(store).accept(methodLevelEc);
+    final SeContainerInitializer sci = seContainerInitializer(methodLevelEc.getRequiredTestClass(), store);
+    if (LOGGER.isLoggable(TRACE)) {
+      LOGGER.log(TRACE, "Creating SeContainer using " + sci);
+    }
+    final SeContainer sec = sci.initialize();
+    if (LOGGER.isLoggable(TRACE)) {
+      LOGGER.log(TRACE, "Created SeContainer: " + sec);
+    }
+    return sec;
   }
 
-  private final SeContainerInitializer computeSeContainerInitializerIfAbsent(final ExtensionContext ec, final Store store) {
+  private final SeContainerInitializer seContainerInitializer(final ExtensionContext ec) {
+    return seContainerInitializer(ec.getRequiredTestClass(), findStoreForSeContainer(ec));
+  }
+
+  private final SeContainerInitializer seContainerInitializer(final Class<?> testClass, final Store store) {
     return
       store.getOrComputeIfAbsent(SeContainerInitializer.class,
-                                 x -> createSeContainerInitializer(ec),
+                                 __ -> newSeContainerInitializer(testClass, store),
                                  SeContainerInitializer.class);
   }
 
-  private final SeContainerInitializer createSeContainerInitializer(final ExtensionContext extensionContext) {
-    if (LOGGER.isLoggable(TRACE)) {
-      LOGGER.log(TRACE, "Creating SeContainerInitializer");
-    }
-    final Class<?> testClass = extensionContext.getRequiredTestClass();
-    final AlterableContext testContext = new TestContext(extensionContext.getStore(NAMESPACE));
+  private final SeContainerInitializer newSeContainerInitializer(final Class<?> testClass, final Store store) {
+    return
+      newSeContainerInitializer(testClass,
+                                store,
+                                methodLevelExtensionContextSupplier(store));
+  }
+
+  private final SeContainerInitializer newSeContainerInitializer(final Class<?> testClass,
+                                                                 final Store store,
+                                                                 final Supplier<? extends ExtensionContext> methodLevelEcs) {
 
     // If the lifecycle is PER_CLASS:
     // * instance is created by JUnit (!)
@@ -233,141 +229,30 @@ public class CdiSupport extends CdiArgumentResolver
     // * instance is created by JUnit
     // * beforeEach (instance methods)
 
-    SeContainerInitializer sci = this.s.get();
-    if (sci == null) {
-      sci = SeContainerInitializer.newInstance();
+    if (LOGGER.isLoggable(TRACE)) {
+      LOGGER.log(TRACE, "Creating SeContainerInitializer");
     }
-    return sci
+    SeContainerInitializer sci = this.s.get();
+    return sci == null ? SeContainerInitializer.newInstance() : sci
       .addBeanClasses(testClass)
-      .addExtensions(new Extension() {
-          private final <T> void addInjectToSoleConstructorIfNeeded(@Observes
-                                                                    @WithAnnotations(Test.class)
-                                                                    final ProcessAnnotatedType<T> event) {
-            final AnnotatedType<T> t = event.getAnnotatedType();
-            if (t.getJavaClass() == testClass) {
-              final Set<AnnotatedConstructor<T>> constructors = t.getConstructors();
-              if (constructors.size() == 1) {
-                final AnnotatedConstructor<T> c = constructors.iterator().next();
-                if (!c.isAnnotationPresent(Inject.class)) {
-                  // now do it all over again (?!)
-                  final AnnotatedConstructorConfigurator<T> acc = event.configureAnnotatedType()
-                    .constructors()
-                    .iterator()
-                    .next();
-                  if (LOGGER.isLoggable(DEBUG)) {
-                    LOGGER.log(DEBUG, "Adding @Inject to " + acc.getAnnotated());
-                  }
-                  acc.add(InjectLiteral.INSTANCE);
-                }
-              }
-            }
-          }
-          private final <T> void putTestClassInTestScopeUnlessOtherwiseSpecified(@Observes
-                                                                                 final ProcessBeanAttributes<T> event,
-                                                                                 final BeanManager bm) {
-            final Annotated a = event.getAnnotated();
-            if (a instanceof AnnotatedType) {
-              @SuppressWarnings("unchecked")
-              final AnnotatedType<T> t = (AnnotatedType<T>)a;
-              if (t.getJavaClass() == testClass) {
-                for (final Annotation annotation : t.getAnnotations()) {
-                  final Class<? extends Annotation> annotationType = annotation.annotationType();
-                  if (bm.isScope(annotationType) || bm.isNormalScope(annotationType)) {
-                    // The user, or a portable extension, explicitly placed a scope annotation on the test class. This
-                    // may or may not be the scope registered in the BeanAttributes, but that doesn't matter: someone
-                    // intended to specify a scope, one way or another. Leave it alone.
-                    return;
-                  }
-                }
-                if (event.getBeanAttributes().getScope() == Dependent.class) {
-                  // CDI or some portable extension set the scope to Dependent; take this as an indication that the
-                  // scope was defaulted. Force the default scope here to be TestScoped instead.
-                  event.configureBeanAttributes().scope(TestScoped.class);
-                }
-              }
-            }
-          }
-          private final void addTestContextAndPlatformBeans(@Observes
-                                                            final AfterBeanDiscovery event,
-                                                            final BeanManager bm) {
-            event.addContext(testContext);
-            // Provide support for, e.g.:
-            //
-            // @Inject
-            // @Default
-            // ExtensionContext extensionContext;
-            event.addBean()
-              .addTransitiveTypeClosure(extensionContext.getClass())
-              .scope(TestScoped.class)
-              .createWith(cc -> extensionContext);
-            // Provide support for, e.g.:
-            //
-            // @Inject
-            // @Default
-            // TestInfo testInfo;
-            event.addBean()
-              .types(TestInfo.class, Object.class)
-              .scope(TestScoped.class)
-              .produceWith(i -> {
-                  final ExtensionContext ec = i.select(ExtensionContext.class).get();
-                  return new TestInfo() {
-                    @Override
-                    public final String getDisplayName() {
-                      return ec.getDisplayName();
-                    }
-                    @Override
-                    public final Set<String> getTags() {
-                      return ec.getTags();
-                    }
-                    @Override
-                    public final Optional<Class<?>> getTestClass() {
-                      return ec.getTestClass();
-                    }
-                    @Override
-                    public final Optional<Method> getTestMethod() {
-                      return ec.getTestMethod();
-                    }
-                  };
-                });
-            // Provide support for, e.g.:
-            //
-            // @Inject
-            // @Default
-            // TestReporter testReporter;
-            event.<TestReporter>addBean()
-              .types(TestReporter.class, Object.class)
-              .scope(TestScoped.class)
-              .produceWith(i -> i.select(ExtensionContext.class).get()::publishReportEntry);
-            // Provide support for:
-            //
-            // @Inject
-            // @Original // <-- note
-            // MyTestClass junitCreatedTestInstance;
-            event.addBean()
-              .read(bm.createBeanAttributes(event.getAnnotatedType(testClass, null)))
-              .scope(Dependent.class)
-              .addQualifier(Original.Literal.INSTANCE)
-              .createWith(cc -> extensionContext.getRequiredTestInstance());
-          }
-        });
+      .addExtensions(new JUnitPortableExtension(methodLevelEcs, store));
   }
 
   @Override // CdiArgumentResolver
   public final boolean supportsParameter(final ParameterContext parameterContext,
                                          final ExtensionContext extensionContext) {
     return
-      SeContainerInitializer.class == parameterContext.getParameter().getType() &&
-      extensionContext.getTestInstance().isPresent() ||
+      SeContainerInitializer.class == parameterContext.getParameter().getType() ||
       super.supportsParameter(parameterContext, extensionContext);
   }
 
   @Override
   public final Object resolveParameter(final ParameterContext parameterContext,
                                        final ExtensionContext extensionContext) {
-    return
-      SeContainerInitializer.class == parameterContext.getParameter().getType() ?
-      computeSeContainerInitializerIfAbsent(extensionContext) :
-      super.resolveParameter(parameterContext, extensionContext);
+    if (SeContainerInitializer.class == parameterContext.getParameter().getType()) {
+      return seContainerInitializer(extensionContext);
+    }
+    return super.resolveParameter(parameterContext, extensionContext);
   }
 
   @Override // InvocationInterceptor
@@ -375,6 +260,7 @@ public class CdiSupport extends CdiArgumentResolver
                                         final ReflectiveInvocationContext<Method> invocationContext,
                                         final ExtensionContext extensionContext)
     throws Throwable {
+
     Instance<Object> i;
     try {
       i = i(extensionContext);
@@ -383,85 +269,140 @@ public class CdiSupport extends CdiArgumentResolver
       if (LOGGER.isLoggable(DEBUG)) {
         LOGGER.log(DEBUG, e.getMessage(), e);
       }
-      i = null;
+      invocation.proceed();
+      return;
     }
+
     if (i == null) {
       if (LOGGER.isLoggable(WARNING)) {
         LOGGER.log(WARNING, "No Instance<Object> found");
       }
-    } else {
-      final Class<?> c = invocationContext.getTargetClass();
-      final Annotation[] qs = qs(c, bm(i));
-      final Instance<?> i2 = i.select(c, qs);
-      if (i2.isUnsatisfied()) {
-        if (LOGGER.isLoggable(WARNING)) {
-          LOGGER.log(WARNING, "No contextual reference found for " +
-                     c +
-                     " with qualifiers " +
-                     Arrays.asList(qs));
-        }
-      } else if (i2.isAmbiguous()) {
-        if (LOGGER.isLoggable(WARNING)) {
-          LOGGER.log(WARNING, "Multiple unresolvable contextual references found for " +
-                     c +
-                     " with qualifiers " +
-                     Arrays.asList(qs));
-        }
-      } else {
-        final Method m = invocationContext.getExecutable();
-        if (m.trySetAccessible()) {
-          final Object testReference = i2.get();
-          if (LOGGER.isLoggable(DEBUG)) {
-            LOGGER.log(DEBUG,
-                       "Using contextual reference (" +
-                       testReference +
-                       "; class: " +
-                       testReference.getClass().getName() +
-                       ") to invoke test method (" +
-                       m +
-                       ")");
-          }
-          m.invoke(testReference, invocationContext.getArguments().toArray(Object[]::new));
-          invocation.skip();
-          return; // EXIT POINT
-        } else {
-          if (LOGGER.isLoggable(WARNING)) {
-            LOGGER.log(WARNING, m + " could not be made accessible");
-          }
-        }
-      }
+      invocation.proceed();
+      return;
     }
-    invocation.proceed();
+
+    final Class<?> c = invocationContext.getTargetClass();
+    final Annotation[] qs = qs(c, bm(i));
+    final Instance<?> i2 = i.select(c, qs);
+    if (i2.isUnsatisfied()) {
+      if (LOGGER.isLoggable(WARNING)) {
+        LOGGER.log(WARNING, "No contextual reference found for " +
+                   c +
+                   " with qualifiers " +
+                   Arrays.asList(qs));
+      }
+      invocation.proceed();
+      return;
+    }
+
+    if (i2.isAmbiguous()) {
+      if (LOGGER.isLoggable(WARNING)) {
+        LOGGER.log(WARNING, "Multiple unresolvable contextual references found for " +
+                   c +
+                   " with qualifiers " +
+                   Arrays.asList(qs));
+      }
+      invocation.proceed();
+      return;
+    }
+
+    final Method m = invocationContext.getExecutable();
+    if (!m.trySetAccessible()) {
+      if (LOGGER.isLoggable(WARNING)) {
+        LOGGER.log(WARNING, m + " could not be made accessible");
+      }
+      invocation.proceed();
+      return;
+    }
+
+    final Object testReference = i2.get();
+    if (LOGGER.isLoggable(DEBUG)) {
+      LOGGER.log(DEBUG,
+                 "Using contextual reference (" +
+                 testReference +
+                 "; class: " +
+                 testReference.getClass().getName() +
+                 ") to invoke test method (" +
+                 m +
+                 ")");
+    }
+    m.invoke(testReference, invocationContext.getArguments().toArray(Object[]::new));
+    invocation.skip();
+  }
+
+  private static final MethodLevelExtensionContextSupplier methodLevelExtensionContextSupplier(final Store store) {
+    return
+      store.getOrComputeIfAbsent(MethodLevelExtensionContextSupplier.class,
+                                 __ -> new MethodLevelExtensionContextSupplier(),
+                                 MethodLevelExtensionContextSupplier.class);
+
   }
 
   private static final Store findStoreForSeContainer(final ExtensionContext ec) {
-    if (ec.getTestInstanceLifecycle().orElse(PER_METHOD) == PER_METHOD &&
-        "per_class".equalsIgnoreCase(ec.getConfigurationParameter(SeContainer.class.getName() +
-                                                                  ".lifecycle")
-                                     .orElse("per_method"))) {
-      if (LOGGER.isLoggable(INFO)) {
-        LOGGER.log(INFO, "Using class-level store for SeContainer in a test with TestInstance#PER_METHOD lifecycle");
+    // This method is called from resolveParameter, which can be called from almost anywhere.
+    ec.getRequiredTestClass(); // enforce preconditions
+    if (ec.getElement().orElse(null) instanceof Method) {
+      ec.getRequiredTestInstance(); // enforce preconditions
+      if (ec.getTestInstanceLifecycle().orElse(PER_METHOD) == Lifecycle.PER_METHOD &&
+          "per_class".equalsIgnoreCase(ec.getConfigurationParameter(SeContainer.class.getName() +
+                                                                    ".lifecycle").orElse(null))) {
+        if (LOGGER.isLoggable(INFO)) {
+          LOGGER.log(INFO, "Using class-level store for SeContainer in a test with TestInstance#PER_METHOD lifecycle");
+        }
+        return ec.getParent().orElse(ec).getStore(NAMESPACE);
       }
-      return ec.getParent().orElse(ec).getStore(NAMESPACE);
     }
     return ec.getStore(NAMESPACE);
   }
 
-  @Qualifier
-  @Retention(RUNTIME)
-  @Target(PARAMETER)
-  public static @interface Original {
+  private static final class MethodLevelExtensionContextSupplier
+    implements CloseableResource, Consumer<ExtensionContext>, Supplier<ExtensionContext> {
 
-    public static final class Literal extends AnnotationLiteral<Original> implements Original {
+    private static final Logger LOGGER = getLogger(MethodLevelExtensionContextSupplier.class.getName());
 
-      private static final long serialVersionUID = 1L;
+    private volatile ExtensionContext ec; // does this need to be a ThreadLocal?
 
-      public static final Literal INSTANCE = new Literal();
-
-      private Literal() {
-        super();
+    private MethodLevelExtensionContextSupplier() {
+      super();
+      if (LOGGER.isLoggable(TRACE)) {
+        LOGGER.log(TRACE, "Creating");
       }
+    }
 
+    @Override // Consumer<ExtensionContext>
+    public final void accept(final ExtensionContext ec) {
+      final ExtensionContext oldEc = this.ec; // volatile read
+      if (LOGGER.isLoggable(TRACE)) {
+        LOGGER.log(TRACE, "Accepting: " + ec + "; this.ec: " + oldEc);
+      }
+      if (oldEc == null) {
+        // Ensure the supplied ExtensionContext is "method level"
+        ec.getRequiredTestInstance();
+        ec.getRequiredTestMethod();
+        this.ec = ec; // volatile write
+      } else if (oldEc != ec) {
+        if (LOGGER.isLoggable(TRACE)) {
+          LOGGER.log(TRACE, "Replacing " + oldEc + " with " + ec);
+        }
+        this.ec = ec; // volatile write
+      }
+    }
+
+    @Override // CloseableResource
+    public final void close() {
+      if (LOGGER.isLoggable(TRACE)) {
+        LOGGER.log(TRACE, "Closing (" + this + "; this.ec: " + this.ec + ")");
+      }
+      this.ec = null; // volatile write
+    }
+
+    @Override // Supplier<ExtensionContext>
+    public final ExtensionContext get() {
+      final ExtensionContext ec = this.ec; // volatile read
+      if (ec == null) {
+        throw new IllegalStateException("this.ec: null");
+      }
+      return ec;
     }
 
   }

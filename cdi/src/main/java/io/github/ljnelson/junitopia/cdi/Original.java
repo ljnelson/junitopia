@@ -13,33 +13,34 @@
  */
 package io.github.ljnelson.junitopia.cdi;
 
-import jakarta.enterprise.inject.Produces;
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
+import jakarta.enterprise.util.AnnotationLiteral;
 
-import org.junit.jupiter.api.extension.ExtendWith;
+import jakarta.inject.Qualifier;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static java.lang.annotation.ElementType.PARAMETER;
 
-import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_METHOD;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-@ExtendWith(CdiSupport.class)
-@TestInstance(PER_METHOD)
-class TestUseCase00 {
-
-  @Produces
-  private static final int fortyTwo = 42;
+@Documented
+@Qualifier
+@Retention(RUNTIME)
+@Target(PARAMETER)
+public @interface Original {
   
-  private TestUseCase00() {
-    super();
+  public static final class Literal extends AnnotationLiteral<Original> implements Original {
+    
+    private static final long serialVersionUID = 1L;
+    
+    public static final Literal INSTANCE = new Literal();
+    
+    private Literal() {
+      super();
+    }
+    
   }
-
-  @Test
-  void testArgumentResolved(int fortyTwo) {
-    assertEquals(42, fortyTwo);
-  }
-
+  
 }
